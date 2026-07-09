@@ -1,0 +1,15 @@
+# Backend
+backend/venv/
+backend/**/__pycache__/
+backend/.env
+*.pyc
+
+# Frontend (we'll need this once we scaffold it)
+frontend/node_modules/
+frontend/.next/
+frontend/.env
+frontend/.env.local
+
+# General
+.DS_Store
+*.log
