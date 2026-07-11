@@ -1,6 +1,7 @@
 # Backend
 backend/venv/
 backend/arguscore.2026-07-10.private-key.pem
+backend/*.pem
 backend/**/__pycache__/
 backend/.env
 *.pyc
