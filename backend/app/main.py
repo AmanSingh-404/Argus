@@ -73,6 +73,21 @@ async def post_pr_comment(installation_id: int, repo_full_name: str, pr_number: 
         resp.raise_for_status()
         return resp.json()
 
+async def fetch_pr_diff(installation_id: int, repo_full_name: str, pr_number: int) -> str:
+    """Fetches the raw unified diff for a PR, authenticated as the GitHub App installation."""
+    token = await get_installation_token(installation_id)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github.v3.diff",
+            },
+        )
+        resp.raise_for_status()
+        return resp.text
+
+
 
 def verify_signature(payload_body: bytes, signature_header: str | None) -> None:
     """Verifies GitHub's HMAC signature on the webhook payload. Raises 401 if invalid."""
