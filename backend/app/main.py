@@ -159,6 +159,43 @@ async def run_security_agent(diff_chunks: list[str]) -> list[dict]:
 
     return all_findings
 
+async def post_review_comments(installation_id: int, repo_full_name: str, pr_number: int, commit_id: str, findings: list[dict]):
+    """Posts findings as inline comments on specific lines, via GitHub's review API."""
+    token = await get_installation_token(installation_id)
+
+    if not findings:
+        body = "Argus reviewed this PR — no security issues found. 👁️"
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"https://api.github.com/repos/{repo_full_name}/issues/{pr_number}/comments",
+                headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+                json={"body": body},
+            )
+        return
+
+    review_comments = []
+    for f in findings:
+        icon = {"high": "🔴", "medium": "🟡", "low": "🔵"}.get(f.get("severity", "low"), "🔵")
+        review_comments.append({
+            "path": f["file"],
+            "line": f["line"],
+            "body": f"{icon} **SECURITY · {f.get('severity', 'low')}**\n\n{f['message']}\n\n— flagged by security-agent",
+        })
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}/reviews",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+            json={
+                "commit_id": commit_id,
+                "event": "COMMENT",
+                "comments": review_comments,
+            },
+        )
+        if resp.status_code >= 400:
+            print(f"Review post failed ({resp.status_code}): {resp.text}")
+        resp.raise_for_status()
+
 def verify_signature(payload_body: bytes, signature_header: str | None) -> None:
     """Verifies GitHub's HMAC signature on the webhook payload. Raises 401 if invalid."""
     if not signature_header:
@@ -203,12 +240,16 @@ async def github_webhook(request: Request):
         print(f"Action: {action} | Repo: {repo_full_name} | PR #{pr_number}")
 
         if action == "opened":
-            await post_pr_comment(
-                installation_id,
-                repo_full_name,
-                pr_number,
-                "Argus is watching this pull request. 👁️",
-            )
-            print(f"Posted comment on PR #{pr_number}")
+            commit_id = payload.get("pull_request", {}).get("head", {}).get("sha")
+
+            diff_text = await fetch_pr_diff(installation_id, repo_full_name, pr_number)
+            chunks = chunk_diff(diff_text)
+            print(f"Diff split into {len(chunks)} chunk(s)")
+
+            findings = await run_security_agent(chunks)
+            print(f"Security agent found {len(findings)} issue(s)")
+
+            await post_review_comments(installation_id, repo_full_name, pr_number, commit_id, findings)
+            print(f"Posted review on PR #{pr_number}")
 
     return {"status": "received"}
