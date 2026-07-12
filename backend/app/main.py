@@ -143,7 +143,7 @@ async def run_security_agent(diff_chunks: list[str]) -> list[dict]:
         for attempt in range(2):  # one retry if the model returns malformed JSON
             try:
                 response = gemini_client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="gemini-3.5-flash",
                     contents=f"{SECURITY_AGENT_PROMPT}\n\nDIFF:\n{chunk}",
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
