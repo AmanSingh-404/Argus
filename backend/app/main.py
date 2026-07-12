@@ -87,7 +87,32 @@ async def fetch_pr_diff(installation_id: int, repo_full_name: str, pr_number: in
         resp.raise_for_status()
         return resp.text
 
+def chunk_diff(diff_text: str, max_chars_per_chunk: int = 6000) -> list[str]:
+    """Splits a unified diff into per-file chunks, capping size so each chunk stays well within context limits."""
+    file_sections = diff_text.split("diff --git ")
+    chunks = []
+    current_chunk = ""
 
+    for section in file_sections:
+        if not section.strip():
+            continue
+        section = "diff --git " + section
+
+        if len(section) > max_chars_per_chunk:
+            # a single file's diff is huge on its own — truncate it rather than dropping it entirely
+            section = section[:max_chars_per_chunk] + "\n... (truncated, file too large)"
+
+        if len(current_chunk) + len(section) > max_chars_per_chunk:
+            if current_chunk:
+                chunks.append(current_chunk)
+            current_chunk = section
+        else:
+            current_chunk += section
+
+    if current_chunk:
+        chunks.append(current_chunk)
+
+    return chunks
 
 def verify_signature(payload_body: bytes, signature_header: str | None) -> None:
     """Verifies GitHub's HMAC signature on the webhook payload. Raises 401 if invalid."""
