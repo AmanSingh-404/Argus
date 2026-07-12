@@ -10,7 +10,7 @@ import httpx
 from google import genai
 from google.genai import types
 
-gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
 
 SECURITY_AGENT_PROMPT = """You are a security-focused code reviewer. You will be given a unified git diff.
 Identify only genuine security issues: hardcoded secrets/API keys, SQL/command injection risk,
@@ -30,6 +30,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 load_dotenv()
+
+gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 app = FastAPI(title="Argus API", version="0.1.0")
 
