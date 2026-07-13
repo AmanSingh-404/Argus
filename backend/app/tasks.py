@@ -5,7 +5,8 @@ import asyncio
 from app.celery_app import celery_app
 from app.db import SessionLocal
 from app.models import PRReview, AgentRun
-from app.main import fetch_pr_diff, chunk_diff, run_security_agent, post_review_comments
+from app.github_client import fetch_pr_diff, post_review_comments
+from app.security_agent import chunk_diff, run_security_agent
 
 from sqlalchemy.exc import IntegrityError
 
