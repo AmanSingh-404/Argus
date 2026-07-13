@@ -1,14 +1,18 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.sql import func
 from app.db import Base
 
 
 class PRReview(Base):
     __tablename__ = "pr_reviews"
+    __table_args__ = (
+        UniqueConstraint("repo_full_name", "pr_number", "commit_sha", name="uq_repo_pr_commit"),
+    )
 
     id = Column(Integer, primary_key=True)
     repo_full_name = Column(String, nullable=False)
     pr_number = Column(Integer, nullable=False)
+    commit_sha = Column(String, nullable=False)
     status = Column(String, default="pending")  # pending, running, completed, failed
     opened_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
