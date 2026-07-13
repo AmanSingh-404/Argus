@@ -9,6 +9,7 @@ celery_app = Celery(
     "argus",
     broker=os.getenv("REDIS_URL"),
     backend=os.getenv("REDIS_URL"),
+    include=["app.tasks"],
 )
 
 celery_app.conf.update(
