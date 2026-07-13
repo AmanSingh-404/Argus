@@ -1,0 +1,25 @@
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy.sql import func
+from app.db import Base
+
+
+class PRReview(Base):
+    __tablename__ = "pr_reviews"
+
+    id = Column(Integer, primary_key=True)
+    repo_full_name = Column(String, nullable=False)
+    pr_number = Column(Integer, nullable=False)
+    status = Column(String, default="pending")  # pending, running, completed, failed
+    opened_at = Column(DateTime(timezone=True), server_default=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class AgentRun(Base):
+    __tablename__ = "agent_runs"
+
+    id = Column(Integer, primary_key=True)
+    review_id = Column(Integer, ForeignKey("pr_reviews.id"), nullable=False)
+    agent_name = Column(String, nullable=False)
+    output_json = Column(Text, nullable=True)
+    duration_ms = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
