@@ -6,7 +6,7 @@ from app.celery_app import celery_app
 from app.db import SessionLocal
 from app.models import PRReview, AgentRun
 from app.github_client import fetch_pr_diff, post_review_comments
-from app.security_agent import chunk_diff, run_security_agent
+from app.graph import review_graph
 
 from sqlalchemy.exc import IntegrityError
 
@@ -39,8 +39,8 @@ def review_pull_request_task(self, installation_id, repo_full_name, pr_number, c
         start = time.time()
 
         diff_text = loop.run_until_complete(fetch_pr_diff(installation_id, repo_full_name, pr_number))
-        chunks = chunk_diff(diff_text)
-        findings = loop.run_until_complete(run_security_agent(chunks))
+        result = loop.run_until_complete(review_graph.ainvoke({"diff_text": diff_text, "findings": []}))
+        findings = result["findings"]
 
         duration_ms = int((time.time() - start) * 1000)
 
