@@ -2,6 +2,7 @@ import os
 import json
 from google import genai
 from google.genai import types
+import asyncio
 
 gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -52,7 +53,8 @@ async def run_security_agent(diff_chunks: list[str]) -> list[dict]:
         response_text = None
         for attempt in range(2):
             try:
-                response = gemini_client.models.generate_content(
+                response = await asyncio.to_thread(
+                    gemini_client.models.generate_content,
                     model="gemini-3.5-flash",
                     contents=f"{SECURITY_AGENT_PROMPT}\n\nDIFF:\n{chunk}",
                     config=types.GenerateContentConfig(

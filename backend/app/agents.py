@@ -2,6 +2,7 @@ import json
 from google import genai
 from google.genai import types
 from app.security_agent import gemini_client  # reuse the same client instance
+import asyncio
 
 
 def chunk_diff(diff_text: str, max_chars_per_chunk: int = 6000) -> list[str]:
@@ -65,7 +66,8 @@ async def _run_agent(prompt: str, diff_chunks: list[str], agent_name: str) -> li
         response_text = None
         for attempt in range(2):
             try:
-                response = gemini_client.models.generate_content(
+                response = await asyncio.to_thread(
+                    gemini_client.models.generate_content,
                     model="gemini-3.5-flash",
                     contents=f"{prompt}\n\nDIFF:\n{chunk}",
                     config=types.GenerateContentConfig(
