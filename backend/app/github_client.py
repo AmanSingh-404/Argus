@@ -47,6 +47,17 @@ async def fetch_pr_diff(installation_id: int, repo_full_name: str, pr_number: in
         resp.raise_for_status()
         return resp.text
 
+async def fetch_pr_files(installation_id: int, repo_full_name: str, pr_number: int) -> list[str]:
+    """Returns just the list of changed filenames for a PR — used by the Planner to decide routing."""
+    token = await get_installation_token(installation_id)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}/files",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+        )
+        resp.raise_for_status()
+        return [f["filename"] for f in resp.json()]
+
 
 async def post_pr_comment(installation_id: int, repo_full_name: str, pr_number: int, body: str):
     token = await get_installation_token(installation_id)
