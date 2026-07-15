@@ -11,8 +11,11 @@ load_dotenv()
 
 from app.github_client import post_pr_comment  # noqa: E402
 from app.tasks import review_pull_request_task  # noqa: E402
+from app.routes_reviews import router as reviews_router
 
 app = FastAPI(title="Argus API", version="0.1.0")
+
+app.include_router(reviews_router)
 
 app.add_middleware(
     CORSMiddleware,
