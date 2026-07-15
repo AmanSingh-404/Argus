@@ -47,13 +47,22 @@ def review_pull_request_task(self, installation_id, repo_full_name, pr_number, c
 
         duration_ms = int((time.time() - start) * 1000)
 
-        agent_run = AgentRun(
+        for agent_name in ["security", "logic", "style", "tests"]:
+            key = f"{agent_name}_findings"
+            if key in result:
+                db.add(AgentRun(
+                    review_id=review.id,
+                    agent_name=agent_name,
+                    output_json=json.dumps(result[key]),
+                    duration_ms=duration_ms,
+                ))
+
+        db.add(AgentRun(
             review_id=review.id,
-            agent_name="security",
+            agent_name="critic",
             output_json=json.dumps(findings),
             duration_ms=duration_ms,
-        )
-        db.add(agent_run)
+        ))
 
         loop.run_until_complete(
             post_review_comments(installation_id, repo_full_name, pr_number, commit_sha, findings)
