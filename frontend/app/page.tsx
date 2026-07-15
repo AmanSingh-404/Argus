@@ -23,38 +23,6 @@ export default function Home() {
       }
     }, 90);
 
-    // ---- Custom cursor ----
-    const dot = document.getElementById("cursorDot");
-    const ring = document.getElementById("cursorRing");
-    let mx = window.innerWidth / 2,
-      my = window.innerHeight / 2,
-      rx = mx,
-      ry = my;
-    const onMove = (e: MouseEvent) => {
-      mx = e.clientX;
-      my = e.clientY;
-      if (dot) {
-        dot.style.left = mx + "px";
-        dot.style.top = my + "px";
-      }
-    };
-    window.addEventListener("mousemove", onMove);
-    let rafId: number;
-    function loop() {
-      rx += (mx - rx) * 0.18;
-      ry += (my - ry) * 0.18;
-      if (ring) {
-        ring.style.left = rx + "px";
-        ring.style.top = ry + "px";
-      }
-      rafId = requestAnimationFrame(loop);
-    }
-    loop();
-
-    document.querySelectorAll("a, .tilt-card, .mbtn").forEach((el) => {
-      el.addEventListener("mouseenter", () => ring?.classList.add("hover"));
-      el.addEventListener("mouseleave", () => ring?.classList.remove("hover"));
-    });
 
     // ---- Magnetic buttons ----
     document.querySelectorAll(".mbtn").forEach((btn) => {
@@ -135,8 +103,6 @@ export default function Home() {
     // ---- Cleanup on unmount ----
     return () => {
       clearInterval(loadIv);
-      cancelAnimationFrame(rafId);
-      window.removeEventListener("mousemove", onMove);
       staggerObs.disconnect();
       countObs.disconnect();
     };
@@ -166,8 +132,6 @@ export default function Home() {
         }}
       ></div>
 
-      <div className="cursor-ring" id="cursorRing"></div>
-      <div className="cursor-dot" id="cursorDot"></div>
 
       <nav>
         <div className="display" style={{ fontWeight: 800 }}>ARGUS</div>
