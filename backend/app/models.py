@@ -27,3 +27,25 @@ class AgentRun(Base):
     output_json = Column(Text, nullable=True)
     duration_ms = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class DocIndex(Base):
+    __tablename__ = "doc_index"
+
+    id = Column(Integer, primary_key=True)
+    repo_full_name = Column(String, nullable=False)
+    source_path = Column(String, nullable=False)
+    doc_path = Column(String, nullable=False)
+    last_synced_commit_sha = Column(String, nullable=True)
+
+
+class DocsPR(Base):
+    __tablename__ = "docs_prs"
+
+    id = Column(Integer, primary_key=True)
+    repo_full_name = Column(String, nullable=False)
+    pr_number = Column(Integer, nullable=True)
+    trigger = Column(String, nullable=False)  # "push" or "scheduled"
+    source_commit_sha = Column(String, nullable=False)
+    status = Column(String, default="pending")  # pending, opened, failed
+    opened_at = Column(DateTime(timezone=True), server_default=func.now())
