@@ -96,3 +96,47 @@ async def post_review_comments(installation_id: int, repo_full_name: str, pr_num
         if resp.status_code >= 400:
             print(f"Review post failed ({resp.status_code}): {resp.text}")
         resp.raise_for_status()
+
+async def fetch_repo_tree(installation_id: int, repo_full_name: str) -> list[str]:
+    """Returns every file path in the repo's default branch."""
+    token = await get_installation_token(installation_id)
+    async with httpx.AsyncClient() as client:
+        repo_resp = await client.get(
+            f"https://api.github.com/repos/{repo_full_name}",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+        )
+        repo_resp.raise_for_status()
+        default_branch = repo_resp.json()["default_branch"]
+
+        tree_resp = await client.get(
+            f"https://api.github.com/repos/{repo_full_name}/git/trees/{default_branch}?recursive=1",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+        )
+        tree_resp.raise_for_status()
+        return [item["path"] for item in tree_resp.json()["tree"] if item["type"] == "blob"]
+
+
+async def fetch_file_content(installation_id: int, repo_full_name: str, path: str, ref: str = None) -> str:
+    token = await get_installation_token(installation_id)
+    url = f"https://api.github.com/repos/{repo_full_name}/contents/{path}"
+    if ref:
+        url += f"?ref={ref}"
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            url,
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github.raw"},
+        )
+        resp.raise_for_status()
+        return resp.text
+
+
+async def fetch_commit_diff(installation_id: int, repo_full_name: str, base_sha: str, head_sha: str) -> str:
+    """Returns the unified diff between two commits — used for push events."""
+    token = await get_installation_token(installation_id)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"https://api.github.com/repos/{repo_full_name}/compare/{base_sha}...{head_sha}",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github.v3.diff"},
+        )
+        resp.raise_for_status()
+        return resp.text

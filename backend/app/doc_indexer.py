@@ -1,7 +1,7 @@
 import json
 from google.genai import types
 from app.security_agent import gemini_client
-from app.github_client import get_installation_token
+from app.github_client import fetch_repo_tree, fetch_file_content
 import httpx
 
 
@@ -18,36 +18,6 @@ Respond with ONLY a JSON array (no markdown fences, no prose), in this shape:
 ]
 
 Only include pairs you're reasonably confident about. If no clear mapping exists, return []."""
-
-
-async def fetch_repo_tree(installation_id: int, repo_full_name: str) -> list[str]:
-    """Returns every file path in the repo's default branch."""
-    token = await get_installation_token(installation_id)
-    async with httpx.AsyncClient() as client:
-        repo_resp = await client.get(
-            f"https://api.github.com/repos/{repo_full_name}",
-            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
-        )
-        repo_resp.raise_for_status()
-        default_branch = repo_resp.json()["default_branch"]
-
-        tree_resp = await client.get(
-            f"https://api.github.com/repos/{repo_full_name}/git/trees/{default_branch}?recursive=1",
-            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
-        )
-        tree_resp.raise_for_status()
-        return [item["path"] for item in tree_resp.json()["tree"] if item["type"] == "blob"]
-
-
-async def fetch_file_content(installation_id: int, repo_full_name: str, path: str) -> str:
-    token = await get_installation_token(installation_id)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"https://api.github.com/repos/{repo_full_name}/contents/{path}",
-            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github.raw"},
-        )
-        resp.raise_for_status()
-        return resp.text
 
 
 async def build_doc_index(installation_id: int, repo_full_name: str) -> list[dict]:

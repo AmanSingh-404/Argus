@@ -2,6 +2,7 @@ import json
 from google.genai import types
 from app.security_agent import gemini_client
 from app.github_client import get_installation_token, fetch_file_content
+from app.github_client import fetch_commit_diff, fetch_file_content
 import httpx
 
 
