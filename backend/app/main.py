@@ -12,6 +12,7 @@ load_dotenv()
 from app.github_client import post_pr_comment  # noqa: E402
 from app.tasks import review_pull_request_task  # noqa: E402
 from app.routes_reviews import router as reviews_router
+from app.tasks_docs import process_push_event_task
 
 app = FastAPI(title="Argus API", version="0.1.0")
 
@@ -77,3 +78,19 @@ async def github_webhook(request: Request):
             print(f"Enqueued review job for PR #{pr_number}")
 
     return {"status": "received"}
+
+    if event_type == "push":
+        repo_full_name = payload.get("repository", {}).get("full_name")
+        installation_id = payload.get("installation", {}).get("id")
+        before_sha = payload.get("before")
+        after_sha = payload.get("after")
+
+        changed_files = set()
+        for commit in payload.get("commits", []):
+            changed_files.update(commit.get("added", []))
+            changed_files.update(commit.get("modified", []))
+
+        print(f"Push to {repo_full_name}: {before_sha[:7]} -> {after_sha[:7]}, files: {list(changed_files)}")
+
+        if changed_files:
+            process_push_event_task.delay(installation_id, repo_full_name, before_sha, after_sha, list(changed_files))
