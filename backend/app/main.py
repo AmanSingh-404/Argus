@@ -77,8 +77,6 @@ async def github_webhook(request: Request):
             review_pull_request_task.delay(installation_id, repo_full_name, pr_number, commit_sha)
             print(f"Enqueued review job for PR #{pr_number}")
 
-    return {"status": "received"}
-
     if event_type == "push":
         repo_full_name = payload.get("repository", {}).get("full_name")
         installation_id = payload.get("installation", {}).get("id")
@@ -94,3 +92,5 @@ async def github_webhook(request: Request):
 
         if changed_files:
             process_push_event_task.delay(installation_id, repo_full_name, before_sha, after_sha, list(changed_files))
+
+    return {"status": "received"}
