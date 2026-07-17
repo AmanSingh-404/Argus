@@ -53,7 +53,13 @@ async def self_check_draft(draft: str, diff_text: str) -> dict:
     )
     try:
         result = json.loads(response.text)
-    except Exception:
+    except Exception as e:
+        finish_reason = None
+        try:
+            finish_reason = response.candidates[0].finish_reason
+        except Exception:
+            pass
+        print(f"Self-check parse failed: {e} | finish_reason: {finish_reason} | raw: {response.text}")
         return {"confident": False, "issues": ["self-check response could not be parsed"]}
 
     # Enforce consistency ourselves — don't trust the model to have followed its own rule.
