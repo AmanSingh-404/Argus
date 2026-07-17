@@ -48,7 +48,7 @@ async def self_check_draft(draft: str, diff_text: str) -> dict:
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             temperature=0.1,
-            max_output_tokens=1024,
+            max_output_tokens=2048,
         ),
     )
     try:
