@@ -5,6 +5,7 @@ import json
 
 from app.db import get_db
 from app.models import PRReview, AgentRun
+from app.models import DocsPR
 
 router = APIRouter()
 
@@ -50,3 +51,20 @@ def get_review(review_id: int, db: Session = Depends(get_db)):
             for ar in agent_runs
         ],
     }
+
+@router.get("/docs-prs")
+def list_docs_prs(db: Session = Depends(get_db)):
+    prs = db.query(DocsPR).order_by(desc(DocsPR.opened_at)).limit(50).all()
+    return [
+        {
+            "id": p.id,
+            "repo_full_name": p.repo_full_name,
+            "doc_path": p.doc_path,
+            "pr_number": p.pr_number,
+            "trigger": p.trigger,
+            "source_commit_sha": p.source_commit_sha,
+            "status": p.status,
+            "opened_at": p.opened_at.isoformat() if p.opened_at else None,
+        }
+        for p in prs
+    ]
