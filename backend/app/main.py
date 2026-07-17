@@ -101,7 +101,11 @@ async def github_webhook(request: Request):
         installation_id = payload.get("installation", {}).get("id")
         repositories = payload.get("repositories", [])
 
-        if action in ("created", "new_permissions_accepted"):
+        if action in ("created", "new_permissions_accepted", "unsuspend"):
+            if not repositories:
+                from app.github_client import fetch_installation_repos
+                repositories = await fetch_installation_repos(installation_id)
+
             db = SessionLocal()
             for repo in repositories:
                 full_name = repo["full_name"]

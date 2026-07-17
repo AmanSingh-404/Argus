@@ -212,3 +212,14 @@ async def fetch_default_branch_sha(installation_id: int, repo_full_name: str) ->
         )
         ref_resp.raise_for_status()
         return ref_resp.json()["object"]["sha"]
+
+async def fetch_installation_repos(installation_id: int) -> list[dict]:
+    """Returns every repo this installation currently has access to, via the API directly."""
+    token = await get_installation_token(installation_id)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            "https://api.github.com/installation/repositories",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+        )
+        resp.raise_for_status()
+        return resp.json()["repositories"]
