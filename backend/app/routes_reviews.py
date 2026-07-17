@@ -99,3 +99,21 @@ def update_repo_settings(repo_id: int, settings: dict, db: Session = Depends(get
 
     db.commit()
     return {"status": "updated"}
+
+@router.get("/analytics/findings-over-time")
+def findings_over_time(db: Session = Depends(get_db)):
+    reviews = db.query(PRReview).filter(PRReview.status == "completed").order_by(PRReview.opened_at).all()
+
+    result = []
+    for r in reviews:
+        critic_run = db.query(AgentRun).filter(
+            AgentRun.review_id == r.id, AgentRun.agent_name == "critic"
+        ).first()
+        finding_count = len(json.loads(critic_run.output_json)) if critic_run and critic_run.output_json else 0
+        result.append({
+            "pr_number": r.pr_number,
+            "opened_at": r.opened_at.isoformat() if r.opened_at else None,
+            "finding_count": finding_count,
+        })
+
+    return result
