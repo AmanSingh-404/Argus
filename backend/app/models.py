@@ -44,6 +44,7 @@ class DocsPR(Base):
 
     id = Column(Integer, primary_key=True)
     repo_full_name = Column(String, nullable=False)
+    doc_path = Column(String, nullable=True)
     pr_number = Column(Integer, nullable=True)
     trigger = Column(String, nullable=False)  # "push" or "scheduled"
     source_commit_sha = Column(String, nullable=False)
