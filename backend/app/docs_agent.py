@@ -16,14 +16,20 @@ Respond with ONLY the full, complete updated markdown document (no fences, no pr
 this will be written directly as the new file content."""
 
 SELF_CHECK_PROMPT = """You previously drafted an update to a documentation file based on a code diff.
-Below is your draft, and the original diff it was based on. Check your draft for any claims that
-are NOT actually supported by the diff — for example, describing behavior that isn't in the code,
-or missing a change that IS in the diff.
+Below is your draft, and the ORIGINAL diff it was based on — this diff is the only source of truth
+for what changed. Do not assume any other changes happened beyond what's shown in this diff.
 
-Respond with ONLY a JSON object (no markdown fences, no prose) in this shape:
+Check ONLY for these two failure modes:
+1. The draft describes behavior that contradicts what the diff actually shows.
+2. The diff introduces a meaningful, user-visible behavior change that the draft failed to reflect.
+
+Do not flag stylistic issues, and do not speculate about changes outside this diff.
+
+Respond with ONLY a JSON object (no markdown fences, no prose) in this exact shape:
 {"confident": true|false, "issues": ["short description of any problem found"]}
 
-If the draft looks accurate, return {"confident": true, "issues": []}"""
+IMPORTANT: these two fields must be consistent. If "issues" contains anything, "confident" MUST be false.
+If you are confident the draft is accurate, "issues" MUST be an empty array."""
 
 
 async def draft_doc_update(current_doc_content: str, diff_text: str) -> str:
@@ -46,6 +52,12 @@ async def self_check_draft(draft: str, diff_text: str) -> dict:
         ),
     )
     try:
-        return json.loads(response.text)
+        result = json.loads(response.text)
     except Exception:
         return {"confident": False, "issues": ["self-check response could not be parsed"]}
+
+    # Enforce consistency ourselves — don't trust the model to have followed its own rule.
+    if result.get("issues"):
+        result["confident"] = False
+
+    return result
