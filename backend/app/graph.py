@@ -9,21 +9,22 @@ class ReviewState(TypedDict):
     diff_text: str
     files_changed: list[str]
     agents_to_run: list[str]
+    enabled_agents: dict
     security_findings: list
     logic_findings: list
     style_findings: list
     tests_findings: list
-    findings: list  # final, critic-arbitrated output
+    findings: list
 
 
 SECURITY_RELEVANT_EXTENSIONS = {".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".java", ".rb", ".php", ".env", ".yml", ".yaml"}
 SECURITY_RELEVANT_KEYWORDS = ["auth", "login", "password", "token", "secret", "key", "session", "admin", "payment", "sql", "query", "config"]
 CODE_EXTENSIONS = {".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".java", ".rb", ".php"}
 
-
 def planner_node(state: ReviewState) -> dict:
-    """Decides which specialist agents are worth running, based on which files changed."""
+    """Decides which specialist agents are worth running, based on which files changed AND repo settings."""
     files = state["files_changed"]
+    enabled_agents = state.get("enabled_agents", {"security": True, "logic": True, "style": True, "tests": True})
     agents_to_run = []
 
     has_code_file = any(any(f.lower().endswith(ext) for ext in CODE_EXTENSIONS) for f in files)
@@ -33,15 +34,20 @@ def planner_node(state: ReviewState) -> dict:
         for f in files
     )
 
-    if has_security_signal:
+    if has_security_signal and enabled_agents.get("security", True):
         agents_to_run.append("security")
     if has_code_file:
-        agents_to_run.extend(["logic", "style", "tests"])
+        if enabled_agents.get("logic", True):
+            agents_to_run.append("logic")
+        if enabled_agents.get("style", True):
+            agents_to_run.append("style")
+        if enabled_agents.get("tests", True):
+            agents_to_run.append("tests")
 
     if agents_to_run:
         print(f"Planner: routing to {agents_to_run} (files: {files})")
     else:
-        print(f"Planner: no relevant agents for files: {files}")
+        print(f"Planner: no relevant agents for files: {files} (or all disabled in repo settings)")
 
     return {"agents_to_run": agents_to_run}
 
