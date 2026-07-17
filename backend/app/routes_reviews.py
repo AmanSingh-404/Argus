@@ -6,6 +6,7 @@ import json
 from app.db import get_db
 from app.models import PRReview, AgentRun
 from app.models import DocsPR
+from app.models import Repo
 
 router = APIRouter()
 
@@ -68,3 +69,33 @@ def list_docs_prs(db: Session = Depends(get_db)):
         }
         for p in prs
     ]
+
+@router.get("/repos")
+def list_repos(db: Session = Depends(get_db)):
+    repos = db.query(Repo).all()
+    return [
+        {
+            "id": r.id,
+            "full_name": r.full_name,
+            "security_agent_enabled": r.security_agent_enabled == "true",
+            "logic_agent_enabled": r.logic_agent_enabled == "true",
+            "style_agent_enabled": r.style_agent_enabled == "true",
+            "tests_agent_enabled": r.tests_agent_enabled == "true",
+            "docs_agent_enabled": r.docs_agent_enabled == "true",
+        }
+        for r in repos
+    ]
+
+
+@router.patch("/repos/{repo_id}")
+def update_repo_settings(repo_id: int, settings: dict, db: Session = Depends(get_db)):
+    repo = db.query(Repo).filter(Repo.id == repo_id).first()
+    if not repo:
+        return {"error": "not found"}
+
+    for field in ["security_agent_enabled", "logic_agent_enabled", "style_agent_enabled", "tests_agent_enabled", "docs_agent_enabled"]:
+        if field in settings:
+            setattr(repo, field, "true" if settings[field] else "false")
+
+    db.commit()
+    return {"status": "updated"}
