@@ -99,3 +99,51 @@ def process_push_event_task(installation_id, repo_full_name, before_sha, after_s
             db.commit()
 
     db.close()
+
+INSTALLATION_ID = 145805684  # same as run_indexer.py — single-repo setup for now
+SWEEP_REPO = "AmanSingh-404/argus-test-repo"
+
+
+@celery_app.task(name="sweep_docs_drift")
+def sweep_docs_drift_task():
+    """Nightly sweep: catches drift not tied to a single tracked push."""
+    from app.github_client import fetch_default_branch_sha
+
+    db = SessionLocal()
+    mappings = db.query(DocIndex).filter(DocIndex.repo_full_name == SWEEP_REPO).all()
+
+    if not mappings:
+        print("Sweep: no doc_index mappings to check")
+        db.close()
+        return
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    current_head = loop.run_until_complete(fetch_default_branch_sha(INSTALLATION_ID, SWEEP_REPO))
+    print(f"Sweep: current HEAD is {current_head[:7]}")
+
+    for m in mappings:
+        if not m.last_synced_commit_sha:
+            print(f"Sweep: {m.source_path} has never been synced — setting baseline to current HEAD, no PR this run")
+            m.last_synced_commit_sha = current_head
+            db.commit()
+            continue
+
+        if m.last_synced_commit_sha == current_head:
+            print(f"Sweep: {m.source_path} already up to date")
+            continue
+
+        already_open = db.query(DocsPR).filter(
+            DocsPR.repo_full_name == SWEEP_REPO,
+            DocsPR.doc_path == m.doc_path,
+            DocsPR.status == "opened",
+        ).first()
+        if already_open:
+            print(f"Sweep: {m.doc_path} already has an open PR (#{already_open.pr_number}) — skipping to avoid duplicate")
+            continue
+
+        print(f"Sweep: checking {m.source_path} for drift since {m.last_synced_commit_sha[:7]}")
+        process_push_event_task(INSTALLATION_ID, SWEEP_REPO, m.last_synced_commit_sha, current_head, [m.source_path])
+
+    db.close()
