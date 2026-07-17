@@ -9,7 +9,7 @@ from app.github_client import fetch_pr_diff, fetch_pr_files, post_review_comment
 from app.graph import review_graph
 
 from sqlalchemy.exc import IntegrityError
-
+from app.models import Repo
 
 @celery_app.task(name="review_pull_request", bind=True, max_retries=2)
 def review_pull_request_task(self, installation_id, repo_full_name, pr_number, commit_sha):
@@ -40,8 +40,21 @@ def review_pull_request_task(self, installation_id, repo_full_name, pr_number, c
 
         diff_text = loop.run_until_complete(fetch_pr_diff(installation_id, repo_full_name, pr_number))
         files_changed = loop.run_until_complete(fetch_pr_files(installation_id, repo_full_name, pr_number))
+        repo_settings = db.query(Repo).filter(Repo.full_name == repo_full_name).first()
+        enabled_agents = {
+            "security": repo_settings.security_agent_enabled == "true" if repo_settings else True,
+            "logic": repo_settings.logic_agent_enabled == "true" if repo_settings else True,
+            "style": repo_settings.style_agent_enabled == "true" if repo_settings else True,
+            "tests": repo_settings.tests_agent_enabled == "true" if repo_settings else True,
+        }
+
         result = loop.run_until_complete(
-            review_graph.ainvoke({"diff_text": diff_text, "files_changed": files_changed, "findings": []})
+            review_graph.ainvoke({
+                "diff_text": diff_text,
+                "files_changed": files_changed,
+                "enabled_agents": enabled_agents,
+                "findings": [],
+            })
         )
         findings = result["findings"]
 
