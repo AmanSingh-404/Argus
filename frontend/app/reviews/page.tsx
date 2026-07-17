@@ -12,8 +12,14 @@ interface Review {
   opened_at: string;
   completed_at: string | null;
 }
+interface AnalyticsPoint {
+  pr_number: number;
+  opened_at: string;
+  finding_count: number;
+}
 
 export default function ReviewsPage() {
+  const [analytics, setAnalytics] = useState<AnalyticsPoint[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,6 +31,11 @@ export default function ReviewsPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/analytics/findings-over-time`)
+      .then((res) => res.json())
+      .then((data) => setAnalytics(data))
+      .catch(() => {});
   }, []);
 
   return (
@@ -57,6 +68,35 @@ export default function ReviewsPage() {
           </Link>
         ))}
       </div>
+      {analytics.length > 0 && (
+        <div style={{ marginTop: 50 }}>
+          <h2 style={{ fontSize: 16, color: "#9C93AE", marginBottom: 20 }}>Findings per PR over time</h2>
+          <svg width="100%" height="140" viewBox={`0 0 ${analytics.length * 50} 140`} style={{ overflow: "visible" }}>
+            {analytics.map((a, i) => {
+              const maxCount = Math.max(...analytics.map((x) => x.finding_count), 1);
+              const barHeight = (a.finding_count / maxCount) * 100;
+              return (
+                <g key={a.pr_number}>
+                  <rect
+                    x={i * 50 + 10}
+                    y={110 - barHeight}
+                    width={24}
+                    height={Math.max(barHeight, 2)}
+                    fill={a.finding_count > 0 ? "#C6F135" : "#2a2a35"}
+                    rx={3}
+                  />
+                  <text x={i * 50 + 22} y={128} fontSize="10" fill="#9C93AE" textAnchor="middle">
+                    #{a.pr_number}
+                  </text>
+                  <text x={i * 50 + 22} y={110 - barHeight - 6} fontSize="10" fill="#F4F1FA" textAnchor="middle">
+                    {a.finding_count}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      )}
     </div>
   );
 }
