@@ -6,6 +6,9 @@ backend/**/__pycache__/
 backend/.env
 *.pyc
 
+
+backend/celerybeat-schedule
+
 # Frontend (we'll need this once we scaffold it)
 frontend/node_modules/
 frontend/.next/
