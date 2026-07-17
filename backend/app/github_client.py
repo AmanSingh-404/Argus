@@ -194,3 +194,21 @@ async def open_pull_request(installation_id: int, repo_full_name: str, title: st
         )
         resp.raise_for_status()
         return resp.json()
+
+async def fetch_default_branch_sha(installation_id: int, repo_full_name: str) -> str:
+    """Returns the current HEAD commit sha of the repo's default branch."""
+    token = await get_installation_token(installation_id)
+    async with httpx.AsyncClient() as client:
+        repo_resp = await client.get(
+            f"https://api.github.com/repos/{repo_full_name}",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+        )
+        repo_resp.raise_for_status()
+        default_branch = repo_resp.json()["default_branch"]
+
+        ref_resp = await client.get(
+            f"https://api.github.com/repos/{repo_full_name}/git/refs/heads/{default_branch}",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+        )
+        ref_resp.raise_for_status()
+        return ref_resp.json()["object"]["sha"]
