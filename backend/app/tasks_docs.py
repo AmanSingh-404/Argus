@@ -45,6 +45,7 @@ def process_push_event_task(installation_id, repo_full_name, before_sha, after_s
             print(f"Self-check not confident — skipping PR. Issues: {check.get('issues')}")
             docs_pr = DocsPR(
                 repo_full_name=repo_full_name,
+                doc_path=m.doc_path,
                 trigger="push",
                 source_commit_sha=after_sha,
                 status="failed",
@@ -77,17 +78,20 @@ def process_push_event_task(installation_id, repo_full_name, before_sha, after_s
 
             db.add(DocsPR(
                 repo_full_name=repo_full_name,
+                doc_path=m.doc_path,
                 pr_number=pr["number"],
                 trigger="push",
                 source_commit_sha=after_sha,
                 status="opened",
             ))
+            m.last_synced_commit_sha = after_sha
             db.commit()
 
         except Exception as e:
             print(f"Failed to open docs PR: {e}")
             db.add(DocsPR(
                 repo_full_name=repo_full_name,
+                doc_path=m.doc_path,
                 trigger="push",
                 source_commit_sha=after_sha,
                 status="failed",
