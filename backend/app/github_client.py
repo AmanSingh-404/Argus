@@ -140,3 +140,57 @@ async def fetch_commit_diff(installation_id: int, repo_full_name: str, base_sha:
         )
         resp.raise_for_status()
         return resp.text
+
+async def create_branch(installation_id: int, repo_full_name: str, new_branch: str, from_sha: str):
+    """Creates a new branch pointing at from_sha."""
+    token = await get_installation_token(installation_id)
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"https://api.github.com/repos/{repo_full_name}/git/refs",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+            json={"ref": f"refs/heads/{new_branch}", "sha": from_sha},
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def commit_file_update(installation_id: int, repo_full_name: str, branch: str, file_path: str, new_content: str, commit_message: str):
+    """Commits an update to an existing file on the given branch."""
+    token = await get_installation_token(installation_id)
+    async with httpx.AsyncClient() as client:
+        # Need the current file's sha to update it (GitHub requires this to avoid overwrite conflicts)
+        get_resp = await client.get(
+            f"https://api.github.com/repos/{repo_full_name}/contents/{file_path}?ref={branch}",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+        )
+        get_resp.raise_for_status()
+        current_sha = get_resp.json()["sha"]
+
+        import base64
+        encoded_content = base64.b64encode(new_content.encode()).decode()
+
+        put_resp = await client.put(
+            f"https://api.github.com/repos/{repo_full_name}/contents/{file_path}",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+            json={
+                "message": commit_message,
+                "content": encoded_content,
+                "sha": current_sha,
+                "branch": branch,
+            },
+        )
+        put_resp.raise_for_status()
+        return put_resp.json()
+
+
+async def open_pull_request(installation_id: int, repo_full_name: str, title: str, body: str, head_branch: str, base_branch: str = "main"):
+    """Opens a PR from head_branch into base_branch."""
+    token = await get_installation_token(installation_id)
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"https://api.github.com/repos/{repo_full_name}/pulls",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+            json={"title": title, "body": body, "head": head_branch, "base": base_branch},
+        )
+        resp.raise_for_status()
+        return resp.json()
