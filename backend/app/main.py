@@ -14,6 +14,9 @@ from app.tasks import review_pull_request_task  # noqa: E402
 from app.routes_reviews import router as reviews_router
 from app.tasks_docs import process_push_event_task
 
+from app.db import SessionLocal
+from app.models import Repo
+
 app = FastAPI(title="Argus API", version="0.1.0")
 
 app.include_router(reviews_router)
@@ -93,4 +96,28 @@ async def github_webhook(request: Request):
         if changed_files:
             process_push_event_task.delay(installation_id, repo_full_name, before_sha, after_sha, list(changed_files))
 
+    if event_type == "installation":
+        action = payload.get("action")
+        installation_id = payload.get("installation", {}).get("id")
+        repositories = payload.get("repositories", [])
+
+        if action in ("created", "new_permissions_accepted"):
+            db = SessionLocal()
+            for repo in repositories:
+                full_name = repo["full_name"]
+                owner, name = full_name.split("/")
+                existing = db.query(Repo).filter(Repo.full_name == full_name).first()
+                if existing:
+                    existing.installation_id = installation_id
+                else:
+                    db.add(Repo(
+                        github_repo_id=repo["id"],
+                        installation_id=installation_id,
+                        owner=owner,
+                        name=name,
+                        full_name=full_name,
+                    ))
+            db.commit()
+            db.close()
+            print(f"Synced {len(repositories)} repo(s) from installation event")
     return {"status": "received"}
