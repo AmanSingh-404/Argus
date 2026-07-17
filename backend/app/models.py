@@ -50,3 +50,19 @@ class DocsPR(Base):
     source_commit_sha = Column(String, nullable=False)
     status = Column(String, default="pending")  # pending, opened, failed
     opened_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class Repo(Base):
+    __tablename__ = "repos"
+
+    id = Column(Integer, primary_key=True)
+    github_repo_id = Column(Integer, nullable=False, unique=True)
+    installation_id = Column(Integer, nullable=False)
+    owner = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    full_name = Column(String, nullable=False, unique=True)
+    installed_at = Column(DateTime(timezone=True), server_default=func.now())
+    security_agent_enabled = Column(String, default="true")
+    logic_agent_enabled = Column(String, default="true")
+    style_agent_enabled = Column(String, default="true")
+    tests_agent_enabled = Column(String, default="true")
+    docs_agent_enabled = Column(String, default="true")
