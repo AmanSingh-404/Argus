@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 
 interface RepoSettings {
   id: number;
@@ -38,7 +37,6 @@ export default function SettingsPage() {
   const toggle = async (repo: RepoSettings, key: keyof RepoSettings) => {
     const newValue = !repo[key];
     setRepos((prev) => prev.map((r) => (r.id === repo.id ? { ...r, [key]: newValue } : r)));
-
     await fetch(`${process.env.NEXT_PUBLIC_API_URL}/repos/${repo.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -47,47 +45,38 @@ export default function SettingsPage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0C0910", color: "#F4F1FA", padding: "60px 7vw", fontFamily: "monospace" }}>
-      <Link href="/reviews" style={{ color: "#9C93AE", fontSize: 13, textDecoration: "none" }}>
-        ← review history
-      </Link>
-
-      <h1 style={{ fontSize: 32, margin: "16px 0 40px", fontWeight: 800 }}>Settings</h1>
-
-      {loading && <p style={{ color: "#9C93AE" }}>Loading…</p>}
-
-      {repos.map((repo) => (
-        <div key={repo.id} style={{ border: "1px solid rgba(244,241,250,0.1)", borderRadius: 12, padding: 24, marginBottom: 20 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>{repo.full_name}</div>
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-            {AGENTS.map((agent) => {
-              const enabled = repo[agent.key] as boolean;
-              return (
-                <button
-                  key={agent.key}
-                  onClick={() => toggle(repo, agent.key)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "10px 16px",
-                    borderRadius: 8,
-                    border: `1px solid ${enabled ? agent.color : "rgba(244,241,250,0.15)"}`,
-                    background: enabled ? `${agent.color}15` : "transparent",
-                    color: enabled ? agent.color : "#9C93AE",
-                    fontFamily: "monospace",
-                    fontSize: 13,
-                    cursor: "pointer",
-                  }}
-                >
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: enabled ? agent.color : "#3a3a3a" }} />
-                  {agent.label}
-                </button>
-              );
-            })}
-          </div>
+    <div className="dash">
+      <div className="dash-inner">
+        <div className="dash-header">
+          <div className="dash-eyebrow">CONFIGURATION</div>
+          <h1 className="dash-h1">Settings</h1>
+          <p className="dash-sub">Toggle which agents run per repo — this changes what the planner routes to in real time.</p>
         </div>
-      ))}
+
+        {loading && <div className="dash-loading">Loading…</div>}
+
+        {repos.map((repo) => (
+          <div key={repo.id} className="dash-card dash-card-pad">
+            <div className="mono" style={{ fontSize: 14, fontWeight: 700, marginBottom: 20 }}>{repo.full_name}</div>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {AGENTS.map((agent) => {
+                const enabled = repo[agent.key] as boolean;
+                return (
+                  <button
+                    key={agent.key}
+                    onClick={() => toggle(repo, agent.key)}
+                    className={`dash-pill ${enabled ? "on" : ""}`}
+                    style={{ "--pill-color": agent.color } as React.CSSProperties}
+                  >
+                    <span className="dot" />
+                    {agent.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
