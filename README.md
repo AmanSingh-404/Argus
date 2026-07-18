@@ -1,225 +1,195 @@
-# Argus — Autonomous Multi-Agent Code Review System
+# Argus
 
-> *In Greek mythology, Argus Panoptes was a giant with a hundred eyes, tasked as an all-seeing guardian. Argus never truly slept — some eyes always stayed open.*
+**A multi-agent system that reviews GitHub pull requests and keeps your documentation in sync — both without you asking.**
 
-**One-liner:** Argus is an autonomous agentic system that watches your GitHub repository. It reviews every pull request the moment it's opened, posting structured, context-aware feedback — security flags, logic bugs, style violations, missing test coverage — and it also **maintains your documentation on its own**, opening PRs to update docs whenever code changes make them stale, the way Mintlify's docs agent does.
+Argus runs in two modes:
 
-Two capabilities, one agent platform:
-1. **Review mode** (reactive) — comments on PRs humans open
-2. **Docs mode** (proactive) — opens its own PRs when it detects documentation drift
-
----
-
-## 1. Why This Project (Positioning)
-
-Most "AI code review" student projects are a single prompt: *"send the diff to GPT, print the response."* Argus is deliberately not that. It's built to demonstrate three things interviewers actually probe on:
-
-| Claim | How Argus proves it |
-|---|---|
-| "I can build production backend systems" | Webhooks, queues, idempotency, OAuth Apps, retries |
-| "I understand agentic AI, not just prompting" | Dynamic planning, tool-using agents, stateful multi-agent graph, arbitration |
-| "I can build agents that *act*, not just comment" | Docs Agent autonomously branches, commits, and opens its own PRs — write access, not just read/comment |
-| "I can ship full-stack" | Real dashboard, real DB, real auth, deployed and demoable |
+1. **Review Mode** (reactive) — the moment a PR opens, a planner routes it to the right specialist agents (Security, Logic, Style, Tests), which run in parallel and report to a Critic that arbitrates conflicts and posts one clean review.
+2. **Docs Mode** (proactive) — after every merge, Argus checks whether the change makes any indexed documentation stale, drafts a fix, verifies its own draft against the actual diff, and opens a real pull request — which it never merges itself.
 
 ---
 
-## 2. System Architecture
+## Why this exists
+
+Most "AI code review" projects are a single prompt wrapping an LLM call. Argus is deliberately not that. It's built around three things:
+
+- **Real orchestration** — a LangGraph graph with a Planner that dynamically decides which agents run based on what actually changed and per-repo settings, not a fixed pipeline.
+- **Real arbitration** — a Critic that dedupes overlapping findings across agents and resolves conflicts by severity, rather than concatenating four opinions.
+- **Real autonomy, with a leash** — the Docs Agent writes to the repo (branches, commits, PRs) on its own, but never merges its own work, and its own drafts get independently self-checked against the diff before anything is opened.
+
+---
+
+## Architecture
 
 ```
-                    ┌─────────────────────────┐
-GitHub PR Event ──▶ │  Webhook Ingestion API   │  (Express/FastAPI)
-(opened/sync)       │  - verifies signature    │
-                     │  - enqueues job          │
-                     └───────────┬─────────────┘
-                                 ▼
-                     ┌─────────────────────────┐
-                     │   Redis + BullMQ Queue   │  (async, retry-safe)
-                     └───────────┬─────────────┘
-                                 ▼
-                     ┌─────────────────────────────────────────┐
-                     │        Argus Orchestrator (LangGraph)     │
-                     │                                           │
-                     │   ┌─────────────┐                         │
-                     │   │ Planner Node │ → decides which agents │
-                     │   └──────┬──────┘   should run on this PR │
-                     │          ▼                                │
-                     │  ┌──────────┬──────────┬──────────┐       │
-                     │  │ Security │  Logic/   │  Style/  │       │
-                     │  │  Agent   │   Bug     │Convention│  ...  │
-                     │  │          │  Agent    │  Agent   │       │
-                     │  └────┬─────┴────┬──────┴────┬─────┘       │
-                     │       └──────────┼───────────┘             │
-                     │                  ▼                         │
-                     │         ┌──────────────────┐               │
-                     │         │  Critic/Aggregator │              │
-                     │         │  - dedupes         │              │
-                     │         │  - ranks severity  │              │
-                     │         │  - resolves conflicts│            │
-                     │         └────────┬───────────┘              │
-                     └──────────────────┼──────────────────────────┘
-                                        ▼
-                          ┌──────────────────────────┐
-                          │   GitHub API Writer       │
-                          │  - inline review comments │
-                          │  - PR summary comment     │
-                          │  - status check (pass/fail)│
-                          └──────────────────────────┘
-                                        │
-                                        ▼
-                          ┌──────────────────────────┐
-                          │  Postgres (run history)   │
-                          └───────────┬──────────────┘
-                                      ▼
-                          ┌──────────────────────────┐
-                          │  Next.js Dashboard        │
-                          │  - review history         │
-                          │  - agent reasoning traces  │
-                          │  - repo health analytics   │
-                          │  - docs PR history         │
-                          └──────────────────────────┘
+GitHub PR opened ─────────► Webhook ─► Celery Queue ─► LangGraph
+                                                          │
+                                                    ┌─────┴─────┐
+                                                 Planner   (decides which
+                                                    │       agents to run,
+                                                    │       respecting per-repo
+                                                    │       settings)
+                                       ┌────────────┼────────────┬─────────┐
+                                   Security       Logic        Style      Tests
+                                       └────────────┴────────────┴─────────┘
+                                                    │
+                                                 Critic
+                                          (dedupe + arbitrate)
+                                                    │
+                                          Inline review posted to GitHub
+
+
+GitHub push to main ───────► Webhook ─► Celery Queue ─► Docs Agent
+                                                          │
+                                                  Check doc_index for
+                                                  affected doc pages
+                                                          │
+                                                  Draft targeted update
+                                                          │
+                                                  Self-check against diff
+                                                          │
+                                              confident? ─┴─ not confident?
+                                                  │              │
+                                          Branch, commit,      Skip, log
+                                          open PR (never       as failed
+                                          auto-merged)
+
+                             (also runs nightly via Celery Beat,
+                              independent of any specific push,
+                              with a dedup guard against
+                              already-open PRs)
 ```
 
-### Second trigger path: the Docs Agent (proactive, not reactive)
-
-This runs on a **different trigger** than the review flow — it fires on `push` to the default branch (i.e., after a PR merges), not on PR-open. It's a separate LangGraph flow that ends in Argus opening its *own* PR rather than commenting on someone else's.
-
-```
-Push to main (PR merged)
-        │
-        ▼
-Diff since last docs run ──▶ Docs Agent
-                                 │
-                    ┌────────────┴─────────────┐
-                    │ 1. Identify affected docs  │  (maps changed source files
-                    │    (route/API/config maps  │   → corresponding doc pages
-                    │    to doc pages)            │   via a repo-specific index)
-                    ├────────────────────────────┤
-                    │ 2. Draft doc updates        │  (rewrites the stale section,
-                    │    (LLM generation)          │   not the whole page)
-                    ├────────────────────────────┤
-                    │ 3. Self-check pass           │  (re-reads generated docs
-                    │    against source of truth)  │   against the actual code diff)
-                    └────────────┬────────────────┘
-                                 ▼
-                    Create branch → commit → open PR
-                    ("docs: update API reference for
-                      /auth endpoint changes")
-                                 │
-                                 ▼
-                    Tag repo maintainer as reviewer
-                    (Argus never auto-merges its own PRs)
-```
+**Stack:** FastAPI · LangGraph · Celery + Redis · PostgreSQL · Gemini API · Next.js 14 · GitHub App (webhooks, installation auth, Git Data API)
 
 ---
 
-## 3. The Agent Layer (the actual "Agentic AI" part)
+## The agents
 
-This is what separates Argus from a wrapper. Each node in the LangGraph graph is a real decision point, not a fixed pipeline stage.
+**Planner** — reads which files changed in a PR, plus per-repo settings, and decides which specialists are worth running. A `.md`-only change skips the code agents entirely; a change touching auth/config files always triggers Security. This is a real runtime decision, logged and inspectable per-review in the dashboard.
 
-### Planner Agent
-Reads the PR metadata (files changed, size, labels, which directories touched) and **decides which specialist agents are worth running**. A 3-line README typo fix should not trigger the Security Agent. A new auth middleware file should trigger Security + Logic, and probably skip Style. This routing logic is your strongest "this is actually agentic" talking point — it's a policy decision, not a hardcoded if-else.
+**Security** — flags hardcoded secrets, injection risk, unsafe deserialization, missing input validation. Pulls full-file context via the GitHub API when the diff hunk alone isn't enough to judge.
 
-### Specialist Agents (each with distinct tools + prompts)
-- **Security Agent** — scans for injected secrets, unsafe deserialization, SQL/command injection patterns, missing input validation. Tool access: can pull the *full file* (not just the diff hunk) via GitHub API to see surrounding context, since vulnerabilities often depend on code outside the changed lines.
-- **Logic/Bug Agent** — traces control flow for off-by-one errors, null/undefined handling, race conditions in async code, unreachable branches.
-- **Style/Convention Agent** — checks against repo-specific conventions (naming, import order, error-handling patterns) inferred from a sample of existing files in the repo, not a generic linter.
-- **Test Coverage Agent** — cross-references changed source files against the test directory; flags logic changes with no corresponding test update.
+**Logic** — traces control flow for off-by-ones, incorrect null handling, race conditions in async code.
 
-### Critic / Aggregator Agent
-Receives all specialist outputs as shared state. Its job: **arbitration**, not concatenation.
-- Deduplicates overlapping findings (Security and Logic agents often flag the same line for different reasons)
-- Ranks by severity (blocking vs. nit)
-- Resolves disagreements (e.g., Style Agent suggests a pattern that Security Agent flags as unsafe — Critic decides which wins)
-- Produces the final structured output that gets posted to GitHub
+**Style** — checks against conventions inferred from the repo's own existing files, not a generic linter config nobody agreed to.
 
-### Docs Agent (the Mintlify-style piece)
-Unlike the review specialists, this agent doesn't just read and report — it **writes to the repo**. It runs on a separate trigger (post-merge push to main, or a scheduled nightly sweep) and follows a distinct three-step loop:
+**Tests** — cross-references changed source files against the test directory, flagging logic changes that shipped without corresponding test updates.
 
-1. **Drift detection** — maintains a lightweight index mapping source files (routes, API handlers, config schemas, public function signatures) to the doc pages that describe them. When a mapped source file changes, the corresponding doc page is flagged as potentially stale.
-2. **Targeted generation** — rewrites only the affected section of the doc, not the whole page. This keeps diffs small and review-friendly (a maintainer should be able to review a docs PR in under a minute).
-3. **Self-check pass** — before opening the PR, a second pass re-reads its own generated docs against the actual code diff and flags low-confidence claims rather than shipping them. This mirrors the Critic pattern from the review flow: generate, then verify, don't just generate.
+**Critic** — takes every specialist's raw output, dedupes findings that land on the same file+line (keeping the higher severity), and produces the single review that actually gets posted. This is the piece that makes it "one clean review" instead of four agents talking over each other.
 
-**Guardrail (important for the demo and for real safety):** Argus never auto-merges its own PRs. Every docs PR is opened as a normal PR, tagged to a human reviewer, and goes through the exact same CI/review process as any other PR — including, notably, Argus's own Review mode reviewing it. That's a nice detail to point out live: *the review agent reviews the docs agent's PRs.*
-
-### Why LangGraph specifically (talking point)
-State persists across the graph run — later agents can see earlier agents' findings, which avoids redundant comments and lets the Critic reason over the *set* of findings rather than isolated outputs. This is the difference you'd explain in an interview between "agentic system" and "four parallel API calls."
+**Docs Agent** — a separate two-step LLM pipeline (draft, then independently self-check the draft against the real diff) that only proceeds to open a PR when the self-check is genuinely confident — enforced in code, not just prompted. It has full write access to the repo but is deliberately never allowed to merge its own work.
 
 ---
 
-## 4. Tech Stack
+## What it actually looks like
 
-| Layer | Choice | Why |
-|---|---|---|
-| Orchestration | **LangGraph** (Python) | Native support for stateful multi-agent graphs, checkpointing, conditional routing |
-| LLM | **Gemini API** (or Claude API) | You already have Gemini experience from CollabIQ/CrashBoard |
-| Backend/Webhook | **FastAPI** (Python) | Keeps ingestion + orchestration in one language, avoids a Node↔Python bridge |
-| Queue | **Redis + BullMQ** or Python **Celery** | Webhook bursts (someone pushes 10 commits fast) need async, retry-safe processing |
-| Database | **PostgreSQL** | Review runs, agent traces, PR metadata, repo settings |
-| Auth | **GitHub OAuth App** (not a raw PAT) | Real installation-token flow, scoped permissions — shows you understand GitHub's actual integration model |
-| Frontend | **Next.js 14 + TypeScript + Tailwind** | Matches your CollabIQ/CrashBoard stack |
-| Git operations | **GitHub API (Git Data API)** — branch creation, tree/blob commits, PR creation | Docs Agent needs real write access, not just comments |
-| Scheduler | **BullMQ repeatable jobs** (or cron) | Triggers the nightly docs-drift sweep independent of push events |
-| Deployment | **Railway/Render** (backend) + **Vercel** (frontend) | You've used both before |
+A real Security finding, posted inline on the exact line:
 
-> Decision point: keep backend fully in Python (FastAPI) since LangGraph is Python-native — avoids maintaining orchestration logic in a second language. Use Next.js purely for the dashboard, talking to FastAPI over REST.
+> 🔴 **SECURITY · high**
+> SQL injection vulnerability due to direct string formatting of `user_id` parameter into the SQL query.
+> — flagged by security-agent, confirmed by critic
+
+A real self-opened docs PR:
+
+> **docs: update docs/api.md to match app.py** — opened by `arguscore[bot]`
+> Argus detected that recent changes to `app.py` may have made `docs/api.md` outdated, and drafted this update.
+> This PR was opened automatically and has not been merged — please review before merging.
+
+*(Screenshots go in `/docs/screenshots` — see "Adding screenshots" below)*
 
 ---
 
-## 5. Data Model (core tables)
+## Dashboard
 
-```
-repos            (id, github_repo_id, owner, name, installed_at, settings_json)
-pr_reviews       (id, repo_id, pr_number, status, opened_at, completed_at)
-agent_runs       (id, review_id, agent_name, input_summary, output_json, duration_ms)
-findings         (id, review_id, agent_name, file_path, line, severity, message, resolved_by_critic)
+- **`/reviews`** — history of every PR reviewed, with a findings-per-PR chart
+- **`/reviews/[id]`** — the trace view: each specialist agent's raw findings side by side, before Critic arbitration, plus the final posted output
+- **`/docs-prs`** — every PR the Docs Agent has opened on its own, with an inline, color-coded diff preview of the source change that triggered it
+- **`/settings`** — per-repo toggles for each agent, which genuinely change what the Planner routes to at runtime (not cosmetic — proven by disabling an agent and confirming it stops running)
 
-doc_index        (id, repo_id, source_path, doc_path, last_synced_commit_sha)
-docs_prs         (id, repo_id, pr_number, trigger, source_commit_sha, status, opened_at)
+---
+
+## Local setup
+
+### 1. Infra
+```bash
+docker-compose up -d
 ```
 
-`agent_runs` is what makes the dashboard's "reasoning trace" view possible — you can replay exactly what each agent saw and concluded, which is a great live demo moment. `doc_index` is the mapping table the Docs Agent uses to know which doc page maps to which source file; `docs_prs` tracks every PR Argus has opened on its own (`trigger` is `push` or `scheduled`).
+### 2. Backend
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate      # Windows: venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+cp .env.example .env          # fill in GitHub App + Gemini credentials
+python create_tables.py
+uvicorn app.main:app --reload --port 8000
+```
+
+In a second terminal, the background worker:
+```bash
+celery -A app.celery_app worker --pool=solo --loglevel=info   # --pool=solo needed on Windows
+```
+
+And a third, for the scheduled docs-drift sweep:
+```bash
+celery -A app.celery_app beat --loglevel=info
+```
+
+### 3. Frontend
+```bash
+cd frontend
+cp .env.example .env.local
+npm install
+npm run dev
+```
+
+### 4. Expose your local server
+GitHub needs a public URL to send webhooks to:
+```bash
+ngrok http 8000
+```
+Set the resulting URL as your GitHub App's webhook URL: `<ngrok-url>/webhooks/github`
+
+### 5. GitHub App setup
+Create a GitHub App with:
+- **Permissions:** Pull requests (read/write), Contents (read/write), Metadata (read-only)
+- **Subscribe to events:** Pull request, Push, Installation
+- Generate a private key, point `GITHUB_APP_PRIVATE_KEY_PATH` at it
+- Install it on a test repository
 
 ---
 
-## 6. Dashboard Features (Next.js)
+## Adding screenshots
 
-1. **Review history** — list of PRs reviewed, pass/fail status, time taken
-2. **Agent trace view** — click into a review, see each agent's individual findings before Critic arbitration (this visually proves the multi-agent architecture — don't skip this)
-3. **Repo analytics** — findings-per-PR trend, most common issue categories over time
-4. **Settings** — toggle which agents are active per repo, severity thresholds for blocking merges
-5. **Docs PR history** — every PR Argus has opened autonomously, with a diff preview, what triggered it (a specific merge vs. the nightly sweep), and merge status — this is the section that visually sells "this agent acts, not just comments"
+To finish this README before sharing it:
+1. Take screenshots of: a real inline Security finding on GitHub, the `/reviews/[id]` trace view, a real self-opened docs PR, and the `/docs-prs` diff preview.
+2. Save them into `docs/screenshots/`.
+3. Replace the placeholder line above with actual `![...]()` image embeds.
 
----
-
-## 7. Build Order (avoid over-scoping)
-
-1. **Week 1** — Webhook → Postgres → single hardcoded agent (Security) → posts one GitHub comment. Get the full loop working end-to-end before anything else.
-2. **Week 2** — Introduce LangGraph, replace the hardcoded call with Planner → Security only, prove routing logic works.
-3. **Week 3** — Add remaining specialist agents in parallel branches + Critic aggregation.
-4. **Week 4** — Queue layer (Redis/BullMQ) for async + retry handling; GitHub OAuth App proper install flow.
-5. **Week 5** — Dashboard: review history + agent trace view (this is the demo centerpiece).
-6. **Week 6** — Docs Agent: drift detection index, targeted generation, self-check pass, branch/commit/PR creation via Git Data API.
-7. **Week 7** — Wire the scheduler (nightly sweep) + docs PR history view in the dashboard.
-8. **Week 8** — Polish: analytics page, deploy, record a demo video, write the README/architecture doc.
-
-> If you're time-boxed, Review mode alone is a complete, demoable project — treat the Docs Agent (weeks 6–7) as the extension that pushes this from "solid" to "standout." Build and ship Review mode first.
+A 2-3 minute demo video (open a PR → watch the review land → merge a change → watch a docs PR appear) is worth more than any number of screenshots — record one if you can.
 
 ---
 
-## 8. Resume Bullet (draft)
+## Known limitations
 
-> **Argus — Autonomous Multi-Agent Code Review & Documentation System** *(LangGraph, FastAPI, Next.js, PostgreSQL, GitHub OAuth)*
-> Built an agentic system that autonomously reviews GitHub PRs using a dynamically-routed multi-agent graph (Planner → 4 specialist agents → Critic arbitration) and independently maintains repo documentation, detecting doc drift from merged commits and opening its own PRs with self-verified updates via GitHub's Git Data API. Processes events asynchronously via Redis/BullMQ with retry handling; dashboard visualizes per-agent reasoning traces, review analytics, and autonomously-opened documentation PRs.
+- **Not deployed** — currently runs against local Postgres/Redis via Docker Compose and a local FastAPI/Celery process, tunneled through ngrok. Deployment (Railway/Render + Vercel) is a deliberate next step, not an oversight.
+- **Single-repo assumptions in places** — the nightly sweep and one-time indexer currently reference one hardcoded installation. The `repos` table exists and is populated correctly from real installation events, but not every code path reads from it yet.
+- **Doc indexing is a one-time LLM pass** — it doesn't automatically re-index if a repo's structure changes significantly; re-running the indexer is a manual step for now.
 
 ---
 
-## 9. Interview Questions You Should Be Ready For
+## Build story
 
-- "Why LangGraph over just chaining API calls?" → state persistence, conditional routing, checkpointing for long-running graphs
-- "How do you handle context window limits on large diffs?" → chunking strategy, only pulling full-file context when the Security agent specifically needs it
-- "How do you avoid the LLM hallucinating a vulnerability that doesn't exist?" → talk about how you'd tune prompts/confidence thresholds, and that Critic agent's job includes filtering low-confidence findings
-- "What happens if GitHub sends duplicate webhook events?" → idempotency key on `(repo_id, pr_number, commit_sha)` in `pr_reviews`
-- "How would this scale to 1000s of repos?" → queue-based decoupling, per-repo rate limiting against GitHub API limits, caching unchanged file content between review runs on the same PR
-- "How does the Docs Agent know which docs correspond to which code?" → the `doc_index` mapping table, built once per repo (either from a config file convention or an initial LLM pass over the repo structure), then incrementally updated
-- "What stops the Docs Agent from writing wrong or hallucinated documentation?" → the self-check pass re-verifies generated text against the actual diff before opening the PR; low-confidence claims are flagged inline in the PR description rather than stated as fact; and critically, it never auto-merges — a human always reviews
-- "Why not just auto-merge docs PRs since they're 'low risk'?" → good question to have an opinion on: even low-risk automated changes should have a human checkpoint, especially early in the project's life — this is a deliberate safety/trust design choice, not a limitation
+This was built in phases, each ending in a working, demoable checkpoint before moving to the next — Review Mode (Phases 0-6) first, proven complete and working end-to-end, then the Docs Agent (Phase 7) and its scheduler/dashboard (Phase 8) as a deliberate extension once the core was solid.
+
+A few of the real bugs hit and fixed along the way, if you're curious what actually went wrong building this:
+- A Gemini model ID that got deprecated mid-project, caught via a live 404 during testing
+- A three-way port conflict between two native Postgres installs and Docker, diagnosed via `netstat`/`tasklist`
+- A blocking LLM call silently serializing four "parallel" agents — fixed with `asyncio.to_thread`, verified by comparing before/after timestamps (68s → 30s)
+- A GitHub Apps permissions-approval gate that silently blocked new event types from ever firing, despite the webhook subscription showing as saved
+- A self-check LLM call that contradicted its own stated confidence — caught, root-caused as token truncation, and hardened with a code-level consistency guard rather than trusting the prompt alone
+- Genuine dead code after an unreachable `return` statement, silently swallowing an entire webhook handler
+
+Each of these is logged in the commit history at the point it was fixed.
