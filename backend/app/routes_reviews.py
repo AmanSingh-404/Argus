@@ -7,6 +7,8 @@ from app.db import get_db
 from app.models import PRReview, AgentRun
 from app.models import DocsPR
 from app.models import Repo
+from app.github_client import fetch_commit_diff
+
 
 router = APIRouter()
 
@@ -117,3 +119,25 @@ def findings_over_time(db: Session = Depends(get_db)):
         })
 
     return result
+
+
+@router.get("/docs-prs/{docs_pr_id}/diff")
+async def get_docs_pr_diff(docs_pr_id: int, db: Session = Depends(get_db)):
+    docs_pr = db.query(DocsPR).filter(DocsPR.id == docs_pr_id).first()
+    if not docs_pr or docs_pr.status != "opened":
+        return {"error": "not found or not opened"}
+
+    repo = db.query(Repo).filter(Repo.full_name == docs_pr.repo_full_name).first()
+    if not repo:
+        return {"error": "repo not tracked"}
+
+    try:
+        # Diff from just before the docs PR's source commit to the source commit itself,
+        # showing the code change that triggered this doc update.
+        diff = await fetch_commit_diff(
+            repo.installation_id, docs_pr.repo_full_name,
+            docs_pr.source_commit_sha + "^", docs_pr.source_commit_sha,
+        )
+        return {"diff": diff}
+    except Exception as e:
+        return {"error": str(e)}
