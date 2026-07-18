@@ -28,6 +28,8 @@ const TRIGGER_LABELS: Record<string, string> = {
 export default function DocsPRsPage() {
   const [prs, setPrs] = useState<DocsPRItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [diffs, setDiffs] = useState<Record<number, string>>({});
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/docs-prs`)
@@ -38,6 +40,19 @@ export default function DocsPRsPage() {
       })
       .catch(() => setLoading(false));
   }, []);
+
+  const toggleDiff = async (id: number) => {
+    if (expandedId === id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(id);
+    if (!diffs[id]) {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/docs-prs/${id}/diff`);
+      const data = await res.json();
+      setDiffs((prev) => ({ ...prev, [id]: data.diff || data.error || "No diff available" }));
+    }
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#0C0910", color: "#F4F1FA", padding: "60px 7vw", fontFamily: "monospace" }}>
@@ -55,31 +70,57 @@ export default function DocsPRsPage() {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 1, background: "rgba(244,241,250,0.1)" }}>
         {prs.map((p) => (
-          <a
-            key={p.id}
-            href={p.pr_number ? `https://github.com/${p.repo_full_name}/pull/${p.pr_number}` : undefined}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 140px 140px 160px 180px",
-              gap: 16,
-              alignItems: "center",
-              padding: "16px 20px",
-              background: "#0C0910",
-              color: "#F4F1FA",
-              textDecoration: "none",
-              fontSize: 13,
-            }}
-          >
-            <span>
-              {p.doc_path} {p.pr_number ? <span style={{ color: "#9C93AE" }}>#{p.pr_number}</span> : null}
-            </span>
-            <span style={{ color: "#9C93AE", fontSize: 11 }}>{TRIGGER_LABELS[p.trigger] || p.trigger}</span>
-            <span style={{ color: "#9C93AE", fontSize: 11 }}>{p.source_commit_sha.slice(0, 7)}</span>
-            <span style={{ color: STATUS_COLORS[p.status] || "#9C93AE" }}>{p.status}</span>
-            <span style={{ color: "#9C93AE", fontSize: 11 }}>{new Date(p.opened_at).toLocaleString()}</span>
-          </a>
+          <div key={p.id}>
+            <div
+              onClick={() => toggleDiff(p.id)}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "24px 1fr 140px 140px 160px 180px",
+                gap: 16,
+                alignItems: "center",
+                padding: "16px 20px",
+                background: "#0C0910",
+                color: "#F4F1FA",
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
+              <span style={{ color: "#9C93AE", transform: expandedId === p.id ? "rotate(90deg)" : "none", display: "inline-block" }}>›</span>
+              <span>
+                {p.doc_path} {p.pr_number ? <span style={{ color: "#9C93AE" }}>#{p.pr_number}</span> : null}
+              </span>
+              <span style={{ color: "#9C93AE", fontSize: 11 }}>{TRIGGER_LABELS[p.trigger] || p.trigger}</span>
+              <span style={{ color: "#9C93AE", fontSize: 11 }}>{p.source_commit_sha.slice(0, 7)}</span>
+              <span style={{ color: STATUS_COLORS[p.status] || "#9C93AE" }}>{p.status}</span>
+              <span style={{ color: "#9C93AE", fontSize: 11 }}>{new Date(p.opened_at).toLocaleString()}</span>
+            </div>
+            {expandedId === p.id && (
+              <div style={{ padding: "16px 20px 24px 60px", background: "#0D0F14" }}>
+                <pre style={{ fontSize: 12, lineHeight: 1.6, whiteSpace: "pre-wrap", color: "#9C93AE", margin: 0 }}>
+                  {(diffs[p.id] || "Loading…").split("\n").map((line, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        color: line.startsWith("+") ? "#3FB950" : line.startsWith("-") ? "#FF3D9A" : "#9C93AE",
+                      }}
+                    >
+                      {line}
+                    </div>
+                  ))}
+                </pre>
+                {p.pr_number && (
+                  <a
+                    href={`https://github.com/${p.repo_full_name}/pull/${p.pr_number}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "#C6F135", fontSize: 12, display: "inline-block", marginTop: 12 }}
+                  >
+                    View full PR on GitHub →
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
         ))}
       </div>
     </div>
