@@ -109,7 +109,7 @@ export default function Home() {
   }, []);
 
   return (
-    <>
+    <div className="landing-page">
       <div id="preloader">
         <div className="pct mono" id="pct">0%</div>
         <div className="label">WAKING THE EYES</div>
@@ -210,6 +210,6 @@ export default function Home() {
         <div className="big">Some eyes<br />always stay open.</div>
         <div className="credit">Built by <a href="#">Aman Singh</a> · <a href="#">github.com/AmanSingh-404</a></div>
       </footer>
-    </>
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import CustomCursor from "./components/CustomCursor";
+import DashboardNav from "./components/DashboardNav";
 
 export const metadata: Metadata = {
   title: "Argus — Autonomous code guardian",
@@ -23,6 +24,7 @@ export default function RootLayout({
         />
       </head>
       <body>
+        <DashboardNav />
         <CustomCursor />
         {children}
       </body>
