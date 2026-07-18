@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 
 interface DocsPRItem {
   id: number;
@@ -14,10 +13,10 @@ interface DocsPRItem {
   opened_at: string;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  opened: "#C6F135",
-  failed: "#FF3D9A",
-  pending: "#9C93AE",
+const STATUS_CLASS: Record<string, string> = {
+  opened: "ok",
+  failed: "bad",
+  pending: "neutral",
 };
 
 const TRIGGER_LABELS: Record<string, string> = {
@@ -55,73 +54,62 @@ export default function DocsPRsPage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0C0910", color: "#F4F1FA", padding: "60px 7vw", fontFamily: "monospace" }}>
-      <Link href="/reviews" style={{ color: "#9C93AE", fontSize: 13, textDecoration: "none" }}>
-        ← review history
-      </Link>
+    <div className="dash">
+      <div className="dash-inner">
+        <div className="dash-header">
+          <div className="dash-eyebrow">DOCS MODE</div>
+          <h1 className="dash-h1">Self-Opened Pull Requests</h1>
+          <p className="dash-sub">Every PR Argus has opened on its own — no human triggering it directly.</p>
+        </div>
 
-      <h1 style={{ fontSize: 32, margin: "16px 0 6px", fontWeight: 800 }}>Docs Agent — Self-Opened PRs</h1>
-      <p style={{ color: "#9C93AE", fontSize: 13, marginBottom: 40 }}>
-        Every pull request Argus has opened on its own, with no human triggering it directly.
-      </p>
+        {loading && <div className="dash-loading">Loading…</div>}
+        {!loading && prs.length === 0 && <div className="dash-empty">No self-opened PRs yet.</div>}
 
-      {loading && <p style={{ color: "#9C93AE" }}>Loading…</p>}
-      {!loading && prs.length === 0 && <p style={{ color: "#9C93AE" }}>No self-opened PRs yet.</p>}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 1, background: "rgba(244,241,250,0.1)" }}>
-        {prs.map((p) => (
-          <div key={p.id}>
-            <div
-              onClick={() => toggleDiff(p.id)}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "24px 1fr 140px 140px 160px 180px",
-                gap: 16,
-                alignItems: "center",
-                padding: "16px 20px",
-                background: "#0C0910",
-                color: "#F4F1FA",
-                fontSize: 13,
-                cursor: "pointer",
-              }}
-            >
-              <span style={{ color: "#9C93AE", transform: expandedId === p.id ? "rotate(90deg)" : "none", display: "inline-block" }}>›</span>
-              <span>
-                {p.doc_path} {p.pr_number ? <span style={{ color: "#9C93AE" }}>#{p.pr_number}</span> : null}
-              </span>
-              <span style={{ color: "#9C93AE", fontSize: 11 }}>{TRIGGER_LABELS[p.trigger] || p.trigger}</span>
-              <span style={{ color: "#9C93AE", fontSize: 11 }}>{p.source_commit_sha.slice(0, 7)}</span>
-              <span style={{ color: STATUS_COLORS[p.status] || "#9C93AE" }}>{p.status}</span>
-              <span style={{ color: "#9C93AE", fontSize: 11 }}>{new Date(p.opened_at).toLocaleString()}</span>
-            </div>
-            {expandedId === p.id && (
-              <div style={{ padding: "16px 20px 24px 60px", background: "#0D0F14" }}>
-                <pre style={{ fontSize: 12, lineHeight: 1.6, whiteSpace: "pre-wrap", color: "#9C93AE", margin: 0 }}>
-                  {(diffs[p.id] || "Loading…").split("\n").map((line, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        color: line.startsWith("+") ? "#3FB950" : line.startsWith("-") ? "#FF3D9A" : "#9C93AE",
-                      }}
-                    >
-                      {line}
-                    </div>
-                  ))}
-                </pre>
-                {p.pr_number && (
-                  <a
-                    href={`https://github.com/${p.repo_full_name}/pull/${p.pr_number}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: "#C6F135", fontSize: 12, display: "inline-block", marginTop: 12 }}
-                  >
-                    View full PR on GitHub →
-                  </a>
+        {!loading && prs.length > 0 && (
+          <div className="dash-card">
+            {prs.map((p) => (
+              <div key={p.id}>
+                <div
+                  onClick={() => toggleDiff(p.id)}
+                  className="dash-row"
+                  style={{ gridTemplateColumns: "20px 1fr 130px 90px 100px 180px" }}
+                >
+                  <span className={`dash-chevron ${expandedId === p.id ? "open" : ""}`}>›</span>
+                  <span className="mono" style={{ fontSize: 13.5 }}>
+                    {p.doc_path} {p.pr_number && <span style={{ color: "var(--dim)" }}>#{p.pr_number}</span>}
+                  </span>
+                  <span className="mono" style={{ fontSize: 11, color: "var(--dim)" }}>{TRIGGER_LABELS[p.trigger] || p.trigger}</span>
+                  <span className="mono" style={{ fontSize: 11, color: "var(--dim)" }}>{p.source_commit_sha.slice(0, 7)}</span>
+                  <span className={`dash-badge ${STATUS_CLASS[p.status] || "neutral"}`}>{p.status}</span>
+                  <span className="mono" style={{ fontSize: 11, color: "var(--dim)" }}>{new Date(p.opened_at).toLocaleString()}</span>
+                </div>
+                {expandedId === p.id && (
+                  <div className="dash-diff">
+                    {(diffs[p.id] || "Loading…").split("\n").map((line, i) => (
+                      <div
+                        key={i}
+                        className={`dash-diff-line ${line.startsWith("+") ? "add" : line.startsWith("-") ? "del" : "ctx"}`}
+                      >
+                        {line}
+                      </div>
+                    ))}
+                    {p.pr_number && (
+                      <a
+                        href={`https://github.com/${p.repo_full_name}/pull/${p.pr_number}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="dash-btn"
+                        style={{ marginTop: 16 }}
+                      >
+                        View full PR on GitHub →
+                      </a>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
+            ))}
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
