@@ -36,6 +36,12 @@ const AGENT_COLORS: Record<string, string> = {
   critic: "#F4F1FA",
 };
 
+const SEVERITY_CLASS: Record<string, string> = {
+  high: "bad",
+  medium: "neutral",
+  low: "ok",
+};
+
 export default function ReviewDetailPage() {
   const params = useParams();
   const [review, setReview] = useState<ReviewDetail | null>(null);
@@ -51,64 +57,77 @@ export default function ReviewDetailPage() {
       .catch(() => setLoading(false));
   }, [params.id]);
 
-  if (loading) return <div style={{ background: "#0C0910", minHeight: "100vh", color: "#9C93AE", padding: 60, fontFamily: "monospace" }}>Loading…</div>;
-  if (!review) return <div style={{ background: "#0C0910", minHeight: "100vh", color: "#FF3D9A", padding: 60, fontFamily: "monospace" }}>Review not found.</div>;
+  if (loading) return <div className="dash"><div className="dash-inner"><div className="dash-loading">Loading…</div></div></div>;
+  if (!review) return <div className="dash"><div className="dash-inner"><div className="dash-empty">Review not found.</div></div></div>;
 
   const specialistRuns = review.agent_runs.filter((ar) => ar.agent_name !== "critic");
   const criticRun = review.agent_runs.find((ar) => ar.agent_name === "critic");
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0C0910", color: "#F4F1FA", padding: "50px 7vw", fontFamily: "monospace" }}>
-      <Link href="/reviews" style={{ color: "#9C93AE", fontSize: 13, textDecoration: "none" }}>← back to reviews</Link>
+    <div className="dash">
+      <div className="dash-inner">
+        <Link href="/reviews" className="mono" style={{ color: "var(--dim)", fontSize: 13, textDecoration: "none", display: "inline-block", marginTop: 32 }}>
+          ← back to reviews
+        </Link>
 
-      <h1 style={{ fontSize: 28, margin: "16px 0 6px", fontWeight: 800 }}>
-        {review.repo_full_name} #{review.pr_number}
-      </h1>
-      <p style={{ color: "#9C93AE", fontSize: 13, marginBottom: 40 }}>
-        {review.commit_sha.slice(0, 7)} · {review.status}
-      </p>
+        <div className="dash-header" style={{ paddingTop: 20 }}>
+          <div className="dash-eyebrow">TRACE VIEW</div>
+          <h1 className="dash-h1">{review.repo_full_name} #{review.pr_number}</h1>
+          <p className="dash-sub mono">{review.commit_sha.slice(0, 7)} · {review.status}</p>
+        </div>
 
-      <h2 style={{ fontSize: 15, color: "#9C93AE", marginBottom: 16, letterSpacing: "0.06em" }}>
-        SPECIALIST AGENTS (before critic)
-      </h2>
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(specialistRuns.length, 1)}, 1fr)`, gap: 16, marginBottom: 50 }}>
-        {specialistRuns.map((ar) => (
-          <div key={ar.agent_name} style={{ border: `1px solid ${AGENT_COLORS[ar.agent_name] || "#333"}33`, borderRadius: 12, padding: 20 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-              <span style={{ color: AGENT_COLORS[ar.agent_name] || "#fff", fontWeight: 700, textTransform: "uppercase", fontSize: 13 }}>
-                {ar.agent_name}
-              </span>
-              <span style={{ color: "#9C93AE", fontSize: 11 }}>{(ar.duration_ms / 1000).toFixed(1)}s</span>
-            </div>
-            {ar.findings.length === 0 && <p style={{ color: "#5a5568", fontSize: 12 }}>No findings</p>}
-            {ar.findings.map((f, i) => (
-              <div key={i} style={{ fontSize: 12, marginBottom: 10, paddingBottom: 10, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                <div style={{ color: "#9C93AE" }}>{f.file}:{f.line} · {f.severity}</div>
-                <div style={{ marginTop: 4 }}>{f.message}</div>
+        <div style={{ marginBottom: 16, fontFamily: "'JetBrains Mono'", fontSize: 12, letterSpacing: "0.08em", color: "var(--dim)" }}>
+          SPECIALIST AGENTS — before critic
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(specialistRuns.length, 1)}, 1fr)`, gap: 14, marginBottom: 50 }}>
+          {specialistRuns.map((ar) => (
+            <div
+              key={ar.agent_name}
+              className="dash-card dash-card-pad"
+              style={{ borderColor: `${AGENT_COLORS[ar.agent_name]}33` }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+                <span className="mono" style={{ color: AGENT_COLORS[ar.agent_name], fontWeight: 700, textTransform: "uppercase", fontSize: 12.5 }}>
+                  {ar.agent_name}
+                </span>
+                <span className="mono" style={{ color: "var(--dim)", fontSize: 11 }}>{(ar.duration_ms / 1000).toFixed(1)}s</span>
               </div>
-            ))}
-          </div>
-        ))}
-      </div>
-
-      {criticRun && (
-        <>
-          <h2 style={{ fontSize: 15, color: "#9C93AE", marginBottom: 16, letterSpacing: "0.06em" }}>
-            CRITIC — FINAL ARBITRATED REVIEW ({criticRun.findings.length} posted)
-          </h2>
-          <div style={{ border: "1px solid rgba(244,241,250,0.2)", borderRadius: 12, padding: 20 }}>
-            {criticRun.findings.length === 0 && <p style={{ color: "#5a5568", fontSize: 13 }}>No issues — clean review posted.</p>}
-            {criticRun.findings.map((f, i) => (
-              <div key={i} style={{ fontSize: 13, marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-                <div style={{ color: AGENT_COLORS[f.agent || ""] || "#9C93AE" }}>
-                  {f.file}:{f.line} · {f.severity} · flagged by {f.agent}
+              {ar.findings.length === 0 && <p className="mono" style={{ color: "var(--dim-2)", fontSize: 12 }}>No findings</p>}
+              {ar.findings.map((f, i) => (
+                <div key={i} style={{ fontSize: 12, marginBottom: 12, paddingBottom: 12, borderBottom: i < ar.findings.length - 1 ? "1px solid var(--line)" : "none" }}>
+                  <div className="mono" style={{ color: "var(--dim)", marginBottom: 4 }}>{f.file}:{f.line} · {f.severity}</div>
+                  <div style={{ lineHeight: 1.5 }}>{f.message}</div>
                 </div>
-                <div style={{ marginTop: 4 }}>{f.message}</div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {criticRun && (
+          <>
+            <div style={{ marginBottom: 16, fontFamily: "'JetBrains Mono'", fontSize: 12, letterSpacing: "0.08em", color: "var(--dim)" }}>
+              CRITIC — FINAL ARBITRATED REVIEW ({criticRun.findings.length} posted)
+            </div>
+            <div className="dash-card">
+              {criticRun.findings.length === 0 && (
+                <div className="dash-card-pad" style={{ color: "var(--dim-2)", fontSize: 13 }}>No issues — clean review posted.</div>
+              )}
+              {criticRun.findings.map((f, i) => (
+                <div key={i} className="dash-card-pad" style={{ borderBottom: i < criticRun.findings.length - 1 ? "1px solid var(--line)" : "none" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                    <span className={`dash-badge ${SEVERITY_CLASS[f.severity] || "neutral"}`}>{f.severity}</span>
+                    <span className="mono" style={{ fontSize: 12.5, color: "var(--dim)" }}>{f.file}:{f.line}</span>
+                    <span className="mono" style={{ fontSize: 11, color: AGENT_COLORS[f.agent || ""] || "var(--dim)" }}>
+                      flagged by {f.agent}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13.5, lineHeight: 1.55 }}>{f.message}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
