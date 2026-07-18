@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
+import CustomCursor from "./components/CustomCursor";
 
 export default function Home() {
   useEffect(() => {
@@ -110,6 +112,7 @@ export default function Home() {
 
   return (
     <div className="landing-page">
+      <CustomCursor />
       <div id="preloader">
         <div className="pct mono" id="pct">0%</div>
         <div className="label">WAKING THE EYES</div>
@@ -134,9 +137,14 @@ export default function Home() {
 
 
       <nav>
-        <div className="display" style={{ fontWeight: 800 }}>ARGUS</div>
-        <div><span className="dot-live"></span>WATCHING</div>
-      </nav>
+  <div className="display" style={{ fontWeight: 800 }}>ARGUS</div>
+  <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+    <Link href="/reviews" className="mono" style={{ fontSize: 12.5, color: "var(--ink)", textDecoration: "none", letterSpacing: "0.04em" }}>
+      Dashboard →
+    </Link>
+    <div><span className="dot-live"></span>WATCHING</div>
+  </div>
+</nav>
 
       <section className="hero">
         <div className="blob blob1"></div>
@@ -150,9 +158,9 @@ export default function Home() {
           documentation back when it drifts. No auto-merges. Ever.
         </p>
         <div className="hero-cta">
-          <div className="mbtn" id="mbtn1"><a href="#gallery">Meet the agents ↓</a></div>
-          <div className="mbtn outline" id="mbtn2"><a href="#">View source</a></div>
-        </div>
+  <div className="mbtn" id="mbtn1"><a href="#gallery">Meet the agents ↓</a></div>
+  <div className="mbtn outline" id="mbtn2"><Link href="/reviews">Open dashboard →</Link></div>
+</div>
       </section>
 
       <div className="marquee-strip">
@@ -176,19 +184,50 @@ export default function Home() {
       </section>
 
       <section id="gallery">
-        <h2 className="stagger-head" id="galleryHead">Four agents, one pass</h2>
-        <p className="section-p">
-          Drag sideways. Each one reads the same diff for something different — the critic reconciles
-          what they find into a single review.
-        </p>
-        <div className="gallery-track">
-          <div className="tilt-card c1"><div className="glow"></div><div className="num">01 / SECURITY</div><div><h4>Sec</h4><p>Secrets, injection risk, unsafe deserialization — pulls full-file context when needed.</p></div></div>
-          <div className="tilt-card c2"><div className="glow"></div><div className="num">02 / LOGIC</div><div><h4>Logic</h4><p>Traces control flow for off-by-ones, null handling, race conditions in async code.</p></div></div>
-          <div className="tilt-card c3"><div className="glow"></div><div className="num">03 / STYLE</div><div><h4>Style</h4><p>Checks against conventions inferred from your own repo, not a generic linter.</p></div></div>
-          <div className="tilt-card c4"><div className="glow"></div><div className="num">04 / TESTS</div><div><h4>Tests</h4><p>Flags changed logic that shipped without a corresponding test update.</p></div></div>
-          <div className="tilt-card c5"><div className="glow"></div><div className="num">05 / CRITIC</div><div><h4>Critic</h4><p>Dedupes findings, ranks severity, resolves disagreements. Ships one clean review.</p></div></div>
-        </div>
-      </section>
+  <h2 className="stagger-head" id="galleryHead">Four agents, one pass</h2>
+  <div className="scroll-hint-row" style={{ marginBottom: 4 }}>
+    <p className="section-p" style={{ marginBottom: 0 }}>Each one reads the same diff for something different — the critic reconciles what they find into a single review.</p>
+    <span className="arrow-anim mono" style={{ color: "var(--dim)", fontSize: 13 }}>drag →</span>
+  </div>
+  <div className="gallery-wrap">
+    <div className="gallery-track">
+      <div className="tilt-card c1">
+        <div className="glow"></div>
+        <div className="ghost-num">01</div>
+        <div className="num"><span className="accent-dot" style={{ background: "var(--violet)" }}></span>SECURITY</div>
+        <div><h4>Sec</h4><p>Secrets, injection risk, unsafe deserialization — pulls full-file context when needed.</p></div>
+      </div>
+      <span className="gallery-arrow">→</span>
+      <div className="tilt-card c2">
+        <div className="glow"></div>
+        <div className="ghost-num">02</div>
+        <div className="num"><span className="accent-dot" style={{ background: "var(--pink)" }}></span>LOGIC</div>
+        <div><h4>Logic</h4><p>Traces control flow for off-by-ones, null handling, race conditions in async code.</p></div>
+      </div>
+      <span className="gallery-arrow">→</span>
+      <div className="tilt-card c3">
+        <div className="glow"></div>
+        <div className="ghost-num">03</div>
+        <div className="num"><span className="accent-dot" style={{ background: "var(--cyan)" }}></span>STYLE</div>
+        <div><h4>Style</h4><p>Checks against conventions inferred from your own repo, not a generic linter.</p></div>
+      </div>
+      <span className="gallery-arrow">→</span>
+      <div className="tilt-card c4">
+        <div className="glow"></div>
+        <div className="ghost-num">04</div>
+        <div className="num"><span className="accent-dot" style={{ background: "var(--lime)" }}></span>TESTS</div>
+        <div><h4>Tests</h4><p>Flags changed logic that shipped without a corresponding test update.</p></div>
+      </div>
+      <span className="gallery-arrow">→</span>
+      <div className="tilt-card c5">
+        <div className="glow"></div>
+        <div className="ghost-num">05</div>
+        <div className="num"><span className="accent-dot" style={{ background: "var(--violet)" }}></span>CRITIC</div>
+        <div><h4>Critic</h4><p>Dedupes findings, ranks severity, resolves disagreements. Ships one clean review.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
 
       <section>
         <h2 className="stagger-head" id="modesHead">Two ways it watches</h2>

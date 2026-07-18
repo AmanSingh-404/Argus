@@ -128,6 +128,36 @@ a{ color:inherit; }
 .landing-page .c3{ background:linear-gradient(145deg,#0F2E33,#0C0910); } .landing-page .c3 .glow{ background:var(--cyan); }
 .landing-page .c4{ background:linear-gradient(145deg,#243318,#0C0910); } .landing-page .c4 .glow{ background:var(--lime); }
 .landing-page .c5{ background:linear-gradient(145deg,#1C1329,#0C0910); border:1px solid var(--violet); } .landing-page .c5 .glow{ background:var(--violet); opacity:0.7; }
+/* ---- gallery upgrade: ghost numerals, custom scrollbar, edge fade ---- */
+.landing-page .gallery-wrap{ position:relative; }
+.landing-page .gallery-wrap::before, .landing-page .gallery-wrap::after{
+  content:''; position:absolute; top:0; bottom:30px; width:80px; z-index:2; pointer-events:none;
+}
+.landing-page .gallery-wrap::before{ left:0; background:linear-gradient(90deg, var(--bg), transparent); }
+.landing-page .gallery-wrap::after{ right:0; background:linear-gradient(270deg, var(--bg), transparent); }
+
+.landing-page .gallery-track::-webkit-scrollbar{ height:4px; }
+.landing-page .gallery-track::-webkit-scrollbar-track{ background:transparent; }
+.landing-page .gallery-track::-webkit-scrollbar-thumb{ background:var(--line-strong); border-radius:10px; }
+.landing-page .gallery-track::-webkit-scrollbar-thumb:hover{ background:var(--lime); }
+.landing-page .gallery-track{ scrollbar-width:thin; scrollbar-color:var(--line-strong) transparent; }
+
+.landing-page .tilt-card{ background-blend-mode:overlay; }
+.landing-page .tilt-card .ghost-num{
+  position:absolute; top:-10px; right:10px; font-family:'Unbounded'; font-weight:900;
+  font-size:130px; line-height:1; color:rgba(255,255,255,0.06); z-index:0; user-select:none;
+}
+.landing-page .tilt-card .accent-dot{ width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:8px; }
+
+.landing-page .gallery-arrow{
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  width:22px; color:var(--dim-2); font-family:'JetBrains Mono'; font-size:16px;
+  scroll-snap-align:none;
+}
+
+.landing-page .scroll-hint-row{ display:flex; align-items:center; gap:10px; }
+.landing-page .scroll-hint-row .arrow-anim{ display:inline-flex; animation:nudge 1.6s ease-in-out infinite; }
+@keyframes nudge{ 0%,100%{ transform:translateX(0); } 50%{ transform:translateX(6px); } }
 
 .landing-page .terminal-glass{ border:1px solid var(--line); border-radius:20px; background:rgba(255,255,255,0.03); backdrop-filter:blur(14px); overflow:hidden; }
 .landing-page .terminal-bar{ display:flex; align-items:center; gap:8px; padding:16px 22px; border-bottom:1px solid var(--line); }
