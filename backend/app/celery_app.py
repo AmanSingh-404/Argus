@@ -16,8 +16,10 @@ celery_app = Celery(
     include=["app.tasks", "app.tasks_docs"],
 )
 
+import ssl
+
 if redis_url.startswith("rediss://"):
-    ssl_config = {"ssl_cert_reqs": "CERT_NONE"}
+    ssl_config = {"ssl_cert_reqs": ssl.CERT_NONE}
     celery_app.conf.broker_use_ssl = ssl_config
     celery_app.conf.redis_backend_use_ssl = ssl_config
 
