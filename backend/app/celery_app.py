@@ -7,12 +7,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+redis_url = os.getenv("REDIS_URL", "")
+
 celery_app = Celery(
     "argus",
-    broker=os.getenv("REDIS_URL"),
-    backend=os.getenv("REDIS_URL"),
+    broker=redis_url,
+    backend=redis_url,
     include=["app.tasks", "app.tasks_docs"],
 )
+
+if redis_url.startswith("rediss://"):
+    ssl_config = {"ssl_cert_reqs": "CERT_NONE"}
+    celery_app.conf.broker_use_ssl = ssl_config
+    celery_app.conf.redis_backend_use_ssl = ssl_config
 
 celery_app.conf.update(
     task_serializer="json",
